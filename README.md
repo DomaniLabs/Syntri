@@ -1,8 +1,4 @@
 <p align="center">
-  <img src="assets/syntri-wordmark.svg" alt="Syntri" height="40" />
-</p>
-
-<p align="center">
   <strong>Agent infrastructure for production AI.</strong><br/>
   Build, train, deploy and continuously improve domain-specific AI agents.
 </p>
