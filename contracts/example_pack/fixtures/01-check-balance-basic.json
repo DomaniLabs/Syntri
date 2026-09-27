@@ -1,0 +1,11 @@
+{
+  "name": "basic check balance flow",
+  "turns": [
+    {
+      "input": {"text": "what is my balance", "intent": "check_balance"},
+      "tool_calls": [{"tool": "balance.fetch", "arguments": {}}],
+      "tool_results": [{"success": true, "data": {"balance": "5000", "currency": "NGN"}}],
+      "expected_reply": "Your balance is ₦5,000."
+    }
+  ]
+}

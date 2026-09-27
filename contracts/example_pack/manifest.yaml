@@ -1,0 +1,12 @@
+name: example-check-balance
+display_name: Check Balance
+version: 0.1.0
+description: Fetches and reports the user's account balance.
+author: Syntri
+license: MIT
+intents:
+  - check_balance
+required_entities: []
+required_syntri_version: ">=0.1.0"
+homepage: https://github.com/DomaniLabs/Syntri
+entry_point: contracts.example_pack.pack:CheckBalancePack

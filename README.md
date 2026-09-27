@@ -90,6 +90,47 @@ POST /v1/feedback
 
 An SDK and CLI are in development. See [`/contracts`](/contracts) for the full API schema.
 
+## Building capability packs
+
+A **capability pack** is a small Python package that teaches an agent how to
+handle one job — checking a balance, booking a flight, opening a ticket. Packs
+declare tools and decision logic; the customer's backend does the execution.
+Money-moving operations can never run in the agent — the contract enforces it.
+
+```bash
+pip install syntri-contracts
+```
+
+```python
+from contracts.capability import (
+    CapabilityManifest, CapabilityPack, Decision, WorkflowStatus,
+)
+
+class CheckBalancePack(CapabilityPack):
+    manifest = CapabilityManifest(
+        name="my-check-balance", display_name="Check Balance",
+        version="0.1.0", description="Reports the user's balance.",
+        author="you@example.com", intents=["check_balance"],
+        required_entities=[], entry_point="my_pack.pack:CheckBalancePack",
+    )
+
+    def tools(self):
+        ...  # declare a ToolSpec, e.g. "balance.fetch" (executor=BACKEND)
+
+    def advance(self, session_id, slots, understanding, tool_results, turn_count):
+        if not tool_results:
+            return Decision(action="request_tool", tool="balance.fetch",
+                            arguments={}, status=WorkflowStatus.EXECUTING)
+        data = tool_results[-1].data or {}
+        return Decision(action="reply",
+                        message=f"Your balance is {data.get('balance')}.",
+                        status=WorkflowStatus.COMPLETED)
+```
+
+Full guide: [`contracts/README.md`](/contracts/README.md). Working template:
+[`contracts/example_pack/`](/contracts/example_pack). Validate a pack with
+`syntri pack validate ./my-pack/`.
+
 ## Deployment
 
 Self-hosted first. Syntri runs inside your infrastructure — your data never leaves your environment.
@@ -116,6 +157,8 @@ Docker image and Helm chart coming with the beta release.
 - [ ] Infinitswap connector (first production adapter)
 - [ ] Shadow mode deployment on Infinitswap traffic
 - [ ] Flight booking capability pack
+- [x] Public capability-pack contract (`syntri-contracts`) — *Phase 5, in progress*
+- [ ] `syntri pack validate` and marketplace submission
 - [ ] CLI: `syntri init`, `syntri train`, `syntri evaluate`, `syntri serve`
 - [ ] Syntri Observe dashboard
 
