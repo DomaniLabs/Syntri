@@ -4,26 +4,71 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "syntri-contracts"
-version = "0.1.0"
-description = "Public contracts for building Syntri capability packs"
+version = "0.2.0"
+description = "Public contracts and building blocks for Syntri capability packs"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }
 authors = [{ name = "Domani Labs" }]
-dependencies = ["pydantic>=2.9"]
+# Read from the imports of the extracted modules, not guessed:
+#   pydantic — contracts, experience.schema, and everything typed on them
+#   click    — the CLI (cli.fmt, cli.commands.pack, cli.main)
+dependencies = [
+    "pydantic>=2.9",
+    "click>=8.1",
+]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "pyyaml>=6"]
+dev = ["pytest>=8", "pyyaml>=6", "ruff>=0.7", "mypy>=1.13"]
 
 [project.urls]
 Homepage = "https://github.com/DomaniLabs/Syntri"
 Documentation = "https://github.com/DomaniLabs/Syntri/contracts"
 
+# NOT named `syntri`: that console script belongs to syntri-core, and a second
+# package claiming it would shadow the real CLI depending on install order.
+[project.scripts]
+syntri-pack = "cli.main:main"
+
 [tool.setuptools]
-packages = ["contracts", "contracts.example_pack"]
+packages = [
+    "contracts",
+    "contracts.example_pack",
+    "experience",
+    "store",
+    "policy",
+    "nlu",
+    "capabilities",
+    "cli",
+    "cli.commands",
+]
 
 [tool.setuptools.package-data]
+# PEP 561. The packages are annotated; without this marker every consumer's
+# type checker silently treats the whole contract as Any, which is the
+# opposite of what a published contract is for.
+"contracts" = ["py.typed"]
 "contracts.example_pack" = ["manifest.yaml", "fixtures/*.json", "README.md"]
+"experience" = ["py.typed"]
+"store" = ["py.typed"]
+"policy" = ["py.typed"]
+"nlu" = ["py.typed"]
+"capabilities" = ["py.typed"]
+"cli" = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+# Same rule set syntri-core selects, so the extracted modules lint identically
+# on both sides. E501 (long lines) is confined to prose docstrings.
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501", "UP017", "UP042"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true

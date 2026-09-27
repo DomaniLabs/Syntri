@@ -89,7 +89,7 @@ class ToolSpec(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def _money_never_runs_on_agent(self) -> "ToolSpec":
+    def _money_never_runs_on_agent(self) -> ToolSpec:
         if self.moves_money and self.executor is Executor.AGENT:
             raise ValueError(
                 "a money-moving tool cannot have executor=AGENT; "
