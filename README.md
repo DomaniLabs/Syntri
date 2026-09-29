@@ -102,7 +102,7 @@ pip install syntri-contracts
 ```
 
 ```python
-from contracts.capability import (
+from syntri_contracts.contracts.capability import (
     CapabilityManifest, CapabilityPack, Decision, WorkflowStatus,
 )
 
