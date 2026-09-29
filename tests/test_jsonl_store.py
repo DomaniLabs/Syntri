@@ -21,6 +21,7 @@ from syntri_contracts.experience.schema import (
     JudgmentSource,
     Observation,
     Outcome,
+    SubjectMapEntry,
 )
 from syntri_contracts.store import JsonlStore
 from syntri_contracts.store.jsonl import (
@@ -253,20 +254,27 @@ def test_the_file_is_never_observed_half_written(store, monkeypatch):
 
 
 def test_a_subject_map_entry_is_written(store):
-    assert store.append_subject_map({"__subject__fp_1": "fp_1"}, "inst_1") == 1
+    assert store.append_subject_map(
+        [SubjectMapEntry(observation_id="obs_1",
+                         placeholder="{PHONE_1}", fingerprint="fp_1")],
+        "inst_1",
+    ) == 1
 
     (row,) = store.subjects()
-    assert row == {
-        "placeholder": "fp_1", "fingerprint": "fp_1", "instance_id": "inst_1"
-    }
+    assert row["observation_id"] == "obs_1"
+    assert row["placeholder"] == "{PHONE_1}"
+    assert row["fingerprint"] == "fp_1"
+    assert row["instance_id"] == "inst_1"
+    assert "created_at" in row
 
 
-def test_a_placeholder_entry_keeps_both_halves(store):
-    """
-    Same convention as ExperienceStore: without the `__subject__` prefix
-    the key is a placeholder standing for a fingerprint, not one itself.
-    """
-    store.append_subject_map({"{PHONE_1}": "fp_2"}, "inst_1")
+def test_a_placeholder_entry_keeps_its_fingerprint(store):
+    """The placeholder and the fingerprint it stands for are distinct."""
+    store.append_subject_map(
+        [SubjectMapEntry(observation_id="obs_1",
+                         placeholder="{PHONE_1}", fingerprint="fp_2")],
+        "inst_1",
+    )
 
     (row,) = store.subjects()
     assert row["placeholder"] == "{PHONE_1}"
@@ -274,7 +282,7 @@ def test_a_placeholder_entry_keeps_both_halves(store):
 
 
 def test_an_empty_subject_map_writes_nothing(store):
-    assert store.append_subject_map({}, "inst_1") == 0
+    assert store.append_subject_map([], "inst_1") == 0
     assert not store.file(SUBJECTS).exists()
 
 
@@ -284,8 +292,12 @@ def test_an_empty_subject_map_writes_nothing(store):
 
 
 def test_forget_drops_the_subject_map_entry(store):
-    store.append_subject_map({"__subject__fp_1": "fp_1"}, "inst_1")
-    store.append_subject_map({"__subject__fp_2": "fp_2"}, "inst_1")
+    store.append_subject_map(
+        [SubjectMapEntry(observation_id="o1", placeholder="{PHONE_1}",
+                         fingerprint="fp_1")], "inst_1")
+    store.append_subject_map(
+        [SubjectMapEntry(observation_id="o2", placeholder="{PHONE_1}",
+                         fingerprint="fp_2")], "inst_1")
 
     assert store.forget("fp_1") == 1
 
@@ -300,7 +312,9 @@ def test_forget_keeps_the_corpus(store):
     """
     store.append_observations([obs(text="send 5k to {ACCOUNT_NUMBER_1}",
                                    subject_key="fp_1")])
-    store.append_subject_map({"__subject__fp_1": "fp_1"}, "inst_1")
+    store.append_subject_map(
+        [SubjectMapEntry(observation_id="o1", placeholder="{ACCOUNT_NUMBER_1}",
+                         fingerprint="fp_1")], "inst_1")
 
     store.forget("fp_1")
 
@@ -313,7 +327,9 @@ def test_forget_unlinks_the_observations_it_leaves(store):
         obs(text="mine", subject_key="fp_1"),
         obs(text="theirs", subject_key="fp_2"),
     ])
-    store.append_subject_map({"__subject__fp_1": "fp_1"}, "inst_1")
+    store.append_subject_map(
+        [SubjectMapEntry(observation_id="o1", placeholder="{PHONE_1}",
+                         fingerprint="fp_1")], "inst_1")
 
     store.forget("fp_1")
 
@@ -322,7 +338,9 @@ def test_forget_unlinks_the_observations_it_leaves(store):
 
 
 def test_forget_is_idempotent(store):
-    store.append_subject_map({"__subject__fp_1": "fp_1"}, "inst_1")
+    store.append_subject_map(
+        [SubjectMapEntry(observation_id="o1", placeholder="{PHONE_1}",
+                         fingerprint="fp_1")], "inst_1")
 
     assert store.forget("fp_1") == 1
     assert store.forget("fp_1") == 0
@@ -330,7 +348,9 @@ def test_forget_is_idempotent(store):
 
 def test_forgetting_an_unknown_subject_changes_nothing(store):
     store.append_observations([obs(subject_key="fp_1")])
-    store.append_subject_map({"__subject__fp_1": "fp_1"}, "inst_1")
+    store.append_subject_map(
+        [SubjectMapEntry(observation_id="o1", placeholder="{PHONE_1}",
+                         fingerprint="fp_1")], "inst_1")
 
     assert store.forget("fp_nobody") == 0
     assert len(store.subjects()) == 1
@@ -343,12 +363,59 @@ def test_forgetting_nothing_is_a_no_op(store):
 
 def test_forget_rewrites_atomically(store):
     store.append_observations([obs(subject_key="fp_1") for _ in range(5)])
-    store.append_subject_map({"__subject__fp_1": "fp_1"}, "inst_1")
+    store.append_subject_map(
+        [SubjectMapEntry(observation_id="o1", placeholder="{PHONE_1}",
+                         fingerprint="fp_1")], "inst_1")
 
     store.forget("fp_1")
 
     assert len(lines(store, OBSERVATIONS)) == 5, "every row is still there"
     assert list(Path(store.path).glob(f"*{TMP_SUFFIX}")) == []
+
+
+def test_subject_map_entry_observation_scoped(store):
+    """Same placeholder in two observations: two rows, not one collapsed."""
+    store.append_subject_map(
+        [
+            SubjectMapEntry(observation_id="o1", placeholder="{PHONE_1}",
+                            fingerprint="fp_1"),
+            SubjectMapEntry(observation_id="o2", placeholder="{PHONE_1}",
+                            fingerprint="fp_2"),
+        ],
+        "inst_1",
+    )
+
+    rows = store.subjects()
+    assert len(rows) == 2, "the shared placeholder did not collapse the rows"
+    assert {r["observation_id"]: r["fingerprint"] for r in rows} == {
+        "o1": "fp_1", "o2": "fp_2"
+    }
+
+
+def test_forget_nulls_session_id(store):
+    store.append_observations([obs(subject_key="fp_1", session_id="sess_1")])
+    store.append_subject_map(
+        [SubjectMapEntry(observation_id="o1", placeholder="{PHONE_1}",
+                         fingerprint="fp_1")], "inst_1")
+
+    store.forget("fp_1")
+
+    (row,) = list(store.iter_observations())
+    assert row.session_id is None
+
+
+def test_forget_nulls_both_fields(store):
+    """subject_key and session_id are cleared in the same rewrite pass."""
+    store.append_observations([obs(subject_key="fp_1", session_id="sess_1")])
+    store.append_subject_map(
+        [SubjectMapEntry(observation_id="o1", placeholder="{PHONE_1}",
+                         fingerprint="fp_1")], "inst_1")
+
+    store.forget("fp_1")
+
+    (row,) = list(store.iter_observations())
+    assert row.subject_key is None
+    assert row.session_id is None
 
 
 # --------------------------------------------------------------------------
@@ -392,7 +459,10 @@ def test_append_batch_writes_every_record_type(store):
         ]
         episodes = [Episode(instance_id="inst_1", session_id="s1")]
         judgments: list = []
-        subject_map = {"__subject__fp_1": "fp_1"}
+        subject_map = [
+            SubjectMapEntry(observation_id="o", placeholder="{PHONE_1}",
+                            fingerprint="fp_1")
+        ]
 
     counts = store.append_batch(Batch())
 

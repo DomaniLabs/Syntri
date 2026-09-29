@@ -23,6 +23,7 @@ from syntri_contracts.experience.schema import (
     JudgmentSource,
     Observation,
     Outcome,
+    SubjectMapEntry,
 )
 from syntri_contracts.store import JsonlStore
 from syntri_contracts.store.base import Store
@@ -327,46 +328,67 @@ def test_episodes_can_be_filtered_and_capped(store):
 # -- append_subject_map() --------------------------------------------------
 
 
+def _entry(observation_id="o1", placeholder="{PHONE_1}", fingerprint="fp_1"):
+    return SubjectMapEntry(
+        observation_id=observation_id, placeholder=placeholder, fingerprint=fingerprint
+    )
+
+
 def test_a_subject_entry_round_trips(store):
-    assert store.append_subject_map({"__subject__fp_1": "fp_1"}, "inst_1") == 1
+    assert store.append_subject_map([_entry(fingerprint="fp_1")], "inst_1") == 1
     assert store.forget("fp_1") == 1, "the row is there to be found"
 
 
 def test_a_token_placeholder_round_trips(store):
-    assert store.append_subject_map({"{PHONE_1}": "fp_2"}, "inst_1") == 1
+    assert store.append_subject_map([_entry(fingerprint="fp_2")], "inst_1") == 1
     assert store.forget("fp_2") == 1
 
 
 def test_several_links_are_written_in_one_call(store):
     written = store.append_subject_map(
-        {
-            "__subject__fp_1": "fp_1",
-            "{PHONE_1}": "fp_1",
-            "{ACCOUNT_NUMBER_1}": "fp_3",
-        },
+        [
+            _entry(observation_id="o1", placeholder="{PHONE_1}", fingerprint="fp_1"),
+            _entry(observation_id="o1", placeholder="{ACCOUNT_NUMBER_1}",
+                   fingerprint="fp_3"),
+            _entry(observation_id="o2", placeholder="{PHONE_1}", fingerprint="fp_1"),
+        ],
         "inst_1",
     )
     assert written == 3
 
 
 def test_an_empty_map_writes_nothing(store):
-    assert store.append_subject_map({}, "inst_1") == 0
+    assert store.append_subject_map([], "inst_1") == 0
 
 
-def test_append_subject_records_a_subject_without_the_convention(store):
-    assert store.append_subject("fp_1", instance_id="inst_1") == 1
+def test_append_subject_map_observation_scoped(store):
+    """Same placeholder, two observations: two rows, both retrievable."""
+    written = store.append_subject_map(
+        [
+            _entry(observation_id="o1", placeholder="{PHONE_1}", fingerprint="fp_1"),
+            _entry(observation_id="o2", placeholder="{PHONE_1}", fingerprint="fp_2"),
+        ],
+        "inst_1",
+    )
+    assert written == 2
+    assert store.forget("fp_1") == 1
+    assert store.forget("fp_2") == 1
+
+
+def test_append_subject_writes_one_row_per_token(store):
+    written = store.append_subject(
+        "o1", "fp_1", {"{PHONE_1}": "x", "{EMAIL_1}": "y"}, "inst_1"
+    )
+    assert written == 2, "one row per token, no separate subject row"
+
+
+def test_append_subject_links_are_forgettable(store):
+    store.append_subject("o1", "fp_1", {"{PHONE_1}": "x"}, "inst_1")
     assert store.forget("fp_1") == 1
 
 
-def test_append_subject_records_its_tokens_too(store):
-    written = store.append_subject(
-        "fp_1", {"{PHONE_1}": "fp_1", "{EMAIL_1}": "fp_9"}, "inst_1"
-    )
-    assert written == 3, "the subject, plus one row per token"
-
-
-def test_append_subject_without_a_subject_writes_nothing(store):
-    assert store.append_subject("", {"{PHONE_1}": "fp_1"}, "inst_1") == 0
+def test_append_subject_without_tokens_writes_nothing(store):
+    assert store.append_subject("o1", "fp_1", {}, "inst_1") == 0
 
 
 # -- forget() --------------------------------------------------------------
@@ -377,26 +399,28 @@ def test_forget_keeps_the_corpus(store):
     store.append_observations([
         obs(text="send 5k to {ACCOUNT_NUMBER_1}", subject_key="fp_1")
     ])
-    store.append_subject_map({"__subject__fp_1": "fp_1"}, "inst_1")
+    store.append_subject_map(
+        [_entry(placeholder="{ACCOUNT_NUMBER_1}", fingerprint="fp_1")], "inst_1"
+    )
     store.forget("fp_1")
     (survivor,) = store.observations("inst_1")
     assert survivor.text == "send 5k to {ACCOUNT_NUMBER_1}"
 
 
 def test_forget_reports_how_many_links_it_dropped(store):
-    store.append_subject_map({"__subject__fp_1": "fp_1"}, "inst_1")
+    store.append_subject_map([_entry(fingerprint="fp_1")], "inst_1")
     assert store.forget("fp_1") == 1
 
 
 def test_forget_is_idempotent(store):
-    store.append_subject_map({"__subject__fp_1": "fp_1"}, "inst_1")
+    store.append_subject_map([_entry(fingerprint="fp_1")], "inst_1")
     store.forget("fp_1")
     assert store.forget("fp_1") == 0
 
 
 def test_forgetting_an_unknown_subject_drops_nothing(store):
     store.append_observations([obs(subject_key="fp_1")])
-    store.append_subject_map({"__subject__fp_1": "fp_1"}, "inst_1")
+    store.append_subject_map([_entry(fingerprint="fp_1")], "inst_1")
     assert store.forget("fp_nobody") == 0
     assert store.forget("fp_1") == 1, "the real subject is still linked"
 
@@ -406,10 +430,10 @@ def test_nothing_recoverable_survives_forget(store):
         obs(text="send 5k to {ACCOUNT_NUMBER_1}", subject_key="fp_1")
     ])
     store.append_subject(
-        "fp_1", {"{PHONE_1}": "fp_1", "{ACCOUNT_NUMBER_1}": "fp_1"}, "inst_1"
+        "o1", "fp_1", {"{PHONE_1}": "x", "{ACCOUNT_NUMBER_1}": "y"}, "inst_1"
     )
     dropped = store.forget("fp_1")
-    assert dropped == 3, "the subject entry and both of its tokens"
+    assert dropped == 2, "both of the subject's tokens"
     assert store.forget("fp_1") == 0, "nothing is left to drop"
     (survivor,) = store.observations("inst_1")
     assert survivor.text == "send 5k to {ACCOUNT_NUMBER_1}"
@@ -417,7 +441,7 @@ def test_nothing_recoverable_survives_forget(store):
 
 
 def test_forget_leaves_other_subjects_linked(store):
-    store.append_subject("fp_1", {"{PHONE_1}": "fp_1"}, "inst_1")
-    store.append_subject("fp_2", {"{PHONE_2}": "fp_2"}, "inst_1")
+    store.append_subject("o1", "fp_1", {"{PHONE_1}": "x"}, "inst_1")
+    store.append_subject("o2", "fp_2", {"{PHONE_2}": "x", "{EMAIL_2}": "y"}, "inst_1")
     store.forget("fp_1")
     assert store.forget("fp_2") == 2, "the other subject is untouched"

@@ -12,6 +12,7 @@ unlinkable without touching the corpus.
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Literal
@@ -45,7 +46,9 @@ class Observation(BaseModel):
     model_config = ConfigDict(frozen=True)
     observation_id: str = Field(default_factory=lambda: _id("obs"))
     instance_id: str
-    session_id: str
+    # Required at creation, nullable after erasure: `Store.forget` clears
+    # it in place so a subject's messages cannot be re-grouped by session.
+    session_id: str | None
     episode_id: str | None = None
     actor: Actor = Actor.USER
     channel: str = "unknown"
@@ -63,6 +66,26 @@ class Observation(BaseModel):
     @property
     def is_evaluable(self) -> bool:
         return self.origin is not Origin.SYNTHETIC
+
+
+@dataclass(frozen=True)
+class SubjectMapEntry:
+    """
+    One link between a tokenised placeholder and a subject fingerprint,
+    scoped to the observation it was extracted from.
+
+    Observation-scoped, deliberately. The same placeholder — `{PHONE_1}` —
+    stands for a different person in a different observation, so a link is
+    only meaningful alongside the `observation_id` it came from. This is
+    what `Store.append_subject_map` records and what `forget` drops.
+
+    `fingerprint` is the subject key, never a raw identifier: the phone
+    number was turned into it at ingestion and does not exist in the store.
+    """
+
+    observation_id: str
+    placeholder: str
+    fingerprint: str
 
 
 class EntityGuess(BaseModel):

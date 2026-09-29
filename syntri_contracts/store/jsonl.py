@@ -55,7 +55,7 @@ import logging
 import os
 import threading
 from collections.abc import Iterator, Sequence
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -64,6 +64,7 @@ from syntri_contracts.experience.schema import (
     Interpretation,
     Judgment,
     Observation,
+    SubjectMapEntry,
 )
 from syntri_contracts.store.base import Store
 
@@ -115,28 +116,30 @@ class JsonlStore(Store):
     def append_episodes(self, rows: Sequence[Episode]) -> int:
         return self._append(EPISODES, rows)
 
-    def append_subject_map(self, subject_map: dict, instance_id: str) -> int:
+    def append_subject_map(
+        self, entries: list[SubjectMapEntry], instance_id: str
+    ) -> int:
         """
-        Record subject fingerprints, so `forget` has something to find.
+        Record observation-scoped subject links, so `forget` has something
+        to find.
 
-        Mirrors `ExperienceStore.append_subject_map`, including the
-        `__subject__` prefix convention: a key carrying it is already a
-        fingerprint rather than a placeholder standing for one.
+        Mirrors `ExperienceStore.append_subject_map`: each entry is written
+        as its own row, keyed on the `observation_id` it came from, so the
+        same placeholder in two observations never collapses onto one row.
         """
-        if not subject_map:
+        if not entries:
             return 0
-        rows = []
-        for placeholder, fingerprint in subject_map.items():
-            if placeholder.startswith("__subject__"):
-                rows.append(
-                    {"placeholder": fingerprint, "fingerprint": fingerprint,
-                     "instance_id": instance_id}
-                )
-            else:
-                rows.append(
-                    {"placeholder": placeholder, "fingerprint": fingerprint,
-                     "instance_id": instance_id}
-                )
+        created_at = datetime.now(timezone.utc).isoformat()
+        rows = [
+            {
+                "observation_id": entry.observation_id,
+                "placeholder": entry.placeholder,
+                "fingerprint": entry.fingerprint,
+                "instance_id": instance_id,
+                "created_at": created_at,
+            }
+            for entry in entries
+        ]
         return self._append_raw(SUBJECTS, rows)
 
     def append_batch(self, batch: Any) -> dict[str, int]:
@@ -164,7 +167,7 @@ class JsonlStore(Store):
                     getattr(batch, "judgments", []) or []
                 ),
             }
-            subject_map = getattr(batch, "subject_map", None) or {}
+            subject_map = getattr(batch, "subject_map", None) or []
             instance_id = ""
             observations = getattr(batch, "observations", []) or []
             if observations:
@@ -272,9 +275,10 @@ class JsonlStore(Store):
         with the person, and the corpus is the thing that must outlive
         them.
 
-        The observation's own `subject_key` is cleared in place, so a
-        reader holding only this directory cannot re-group a subject's
-        messages by that column after the map has gone.
+        The observation's own `subject_key` and `session_id` are cleared
+        in place, so a reader holding only this directory cannot re-group a
+        subject's messages by either column after the map has gone. Both
+        fields are nulled in the same rewrite pass, not two.
         """
         if not subject_id:
             return 0
@@ -290,6 +294,7 @@ class JsonlStore(Store):
                 if row.get("subject_key") == subject_id:
                     row = dict(row)
                     row["subject_key"] = None
+                    row["session_id"] = None
                 return row
 
             self._map_rows(OBSERVATIONS, unlink)

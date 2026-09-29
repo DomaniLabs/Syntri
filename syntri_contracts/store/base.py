@@ -54,6 +54,7 @@ from syntri_contracts.experience.schema import (
     Interpretation,
     Judgment,
     Observation,
+    SubjectMapEntry,
 )
 
 
@@ -151,7 +152,11 @@ class Store(ABC):
     # -- the subject lifecycle ---------------------------------------------
 
     @abstractmethod
-    def append_subject_map(self, subject_map: dict[str, str], instance_id: str) -> int:
+    def append_subject_map(
+        self,
+        entries: list[SubjectMapEntry],
+        instance_id: str,
+    ) -> int:
         """
         Record the links `forget` will later drop. Returns rows written.
 
@@ -163,67 +168,64 @@ class Store(ABC):
         captures, and silently erases nothing. Both halves are declared,
         so that backend fails at implementation time instead.
 
-        `subject_map` maps a placeholder to the tokenised value it stands
-        for — `{"{PHONE_1}": "<fingerprint>"}`. **Never a raw identifier
-        on either side.** The fingerprint is what `Observation.subject_key`
-        holds and what `forget` matches on; the raw phone number was
-        turned into it at ingestion and does not exist in the store.
+        Each `SubjectMapEntry` carries the `observation_id` it came from,
+        the `placeholder` (`{PHONE_1}`) and the `fingerprint` it stands
+        for. **Never a raw identifier anywhere.** The fingerprint is what
+        `Observation.subject_key` holds and what `forget` matches on; the
+        raw phone number was turned into it at ingestion and does not
+        exist in the store.
 
-        One key shape is special. A placeholder beginning `__subject__`
-        is not a placeholder at all — its *value* is already the subject
-        fingerprint, and the entry says "this subject exists" rather than
-        "this token stands for that subject". Both backends store it as
-        `placeholder == fingerprint`. `ConnectorBase.subject_map()`
-        produces it, and `append_subject()` below is the typed way to ask
-        for it without knowing the convention.
+        WHY OBSERVATION-SCOPED, AND WHY A LIST
 
-        WHY A MAP RATHER THAN A SUBJECT AND ITS TOKENS
+        The same placeholder means different people in different
+        observations — `{PHONE_1}` in one message is not `{PHONE_1}` in
+        the next — so a link is only meaningful together with the
+        observation it was extracted from. Scoping every entry to its
+        `observation_id` is what keeps two people from collapsing onto one
+        row.
 
-        This is the batch form, and it is the abstract one because it is
-        the shape the data actually has. A single ingest batch merges the
-        token maps of every turn in every session it carries, so one call
-        routinely spans several subjects; and the `subject_map` table is
-        `(placeholder, fingerprint, instance_id, created_at)`, with no
-        column to group rows by subject. A per-subject signature could
-        not express either fact without inventing grouping that is not in
-        the data.
-
-        Use this one when writing what a batch produced — the ingest
-        path, a bulk import, anything that already holds a map. Use
-        `append_subject()` below when you have one subject in hand.
+        A list because that is the shape the data has: a single ingest
+        batch merges the token maps of every turn in every session it
+        carries, so one call routinely spans several observations and
+        several subjects. Use this when writing what a batch produced —
+        the ingest path, a bulk import. Use `append_subject()` below when
+        you have one subject in hand.
         """
 
     def append_subject(
         self,
+        observation_id: str,
         subject_id: str,
-        tokens: dict[str, str] | None = None,
-        instance_id: str = "",
+        tokens: dict[str, str],
+        instance_id: str,
     ) -> int:
         """
-        Record one subject and, optionally, the tokens belonging to it.
+        Record one subject's tokens for a single observation.
 
-        The per-subject view of `append_subject_map`, and the one to
-        reach for when a caller has a single subject rather than a
-        batch: a connector translating one inbound message, a test, a
-        script repairing one person's links.
+        The per-observation view of `append_subject_map`, and the one to
+        reach for when a caller has a single subject in hand: a connector
+        translating one inbound message, a test, a script repairing one
+        person's links.
 
         Concrete, not abstract, and deliberately so. It is defined in
         terms of the abstract method above, which means a backend
         implements one thing and gets both, and there is no way for the
-        two to disagree about what was written. The only thing it adds
-        is knowing the `__subject__` convention so its callers do not
-        have to.
+        two to disagree about what was written.
 
         `subject_id` is a fingerprint. Passing a raw phone number here
         would write the raw phone number into the store, which is the
         one thing this whole mechanism exists to prevent — tokenise
         first, at ingestion, in the connector.
         """
-        if not subject_id:
-            return 0
-        mapping = {f"__subject__{subject_id}": subject_id}
-        mapping.update(tokens or {})
-        return self.append_subject_map(mapping, instance_id)
+        entries = [
+            SubjectMapEntry(
+                observation_id=observation_id,
+                placeholder=placeholder,
+                fingerprint=subject_id,
+            )
+            for placeholder in tokens
+        ]
+        return self.append_subject_map(entries, instance_id)
 
     # -- erasure -----------------------------------------------------------
 

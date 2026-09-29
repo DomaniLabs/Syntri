@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "syntri-contracts"
-version = "0.3.0"
+version = "0.3.1"
 description = "Public contracts and building blocks for Syntri capability packs"
 readme = "README.md"
 requires-python = ">=3.10"
