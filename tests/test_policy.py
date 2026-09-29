@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import pytest
 
-from experience.schema import Actor, Observation
-from policy import (
+from syntri_contracts.experience.schema import Actor, Observation
+from syntri_contracts.policy import (
     FAIL_CLOSED,
     POLICY_CHANNEL,
     POLICY_SOURCE,

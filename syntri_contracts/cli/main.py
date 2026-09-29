@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import click
 
-from cli.commands.pack import pack
+from syntri_contracts.cli.commands.pack import pack
 
 
 @click.group()

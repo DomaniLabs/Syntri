@@ -16,7 +16,7 @@ from pathlib import Path
 
 import click
 
-from cli.fmt import arrow, fail, header, info, kv, ok, warn
+from syntri_contracts.cli.fmt import arrow, fail, header, info, kv, ok, warn
 
 #: Where a pack directory keeps its pack module, in preference order.
 _PACK_MODULES = ("pack.py", "__init__.py")
@@ -44,7 +44,7 @@ def list_packs() -> None:
 
 
 def _list_local() -> None:
-    from capabilities.registry import default_registry
+    from syntri_contracts.capabilities.registry import default_registry
 
     header("Capability packs")
     try:
@@ -92,8 +92,8 @@ def validate(path: Path, verbose: bool) -> None:
 
     Needs no running server — this is the pre-submission check.
     """
-    from capabilities.registry import CapabilityRegistry
-    from capabilities.replay import replay_pack
+    from syntri_contracts.capabilities.registry import CapabilityRegistry
+    from syntri_contracts.capabilities.replay import replay_pack
 
     header(f"Validating {path.name}")
 

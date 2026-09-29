@@ -6,15 +6,15 @@ The gate between understanding an utterance and doing something about it.
 down what happened. Nothing here is specific to a customer or a domain —
 every number it enforces comes out of the instance's own taxonomy.
 """
-from policy.audit import POLICY_CHANNEL, POLICY_SOURCE, AuditLogger
-from policy.engine import (
+from syntri_contracts.policy.audit import POLICY_CHANNEL, POLICY_SOURCE, AuditLogger
+from syntri_contracts.policy.engine import (
     BLOCKING_REASONS,
     TRUSTED_SOURCES,
     PolicyDecision,
     PolicyEngine,
     Reason,
 )
-from policy.floors import FAIL_CLOSED, is_risky, resolve_floor
+from syntri_contracts.policy.floors import FAIL_CLOSED, is_risky, resolve_floor
 
 __all__ = [
     "AuditLogger",

@@ -77,7 +77,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from policy.floors import FAIL_CLOSED, is_risky, resolve_floor
+from syntri_contracts.policy.floors import FAIL_CLOSED, is_risky, resolve_floor
 
 
 class Reason:

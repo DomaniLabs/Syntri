@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "syntri-contracts"
-version = "0.2.0"
+version = "0.3.0"
 description = "Public contracts and building blocks for Syntri capability packs"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -28,33 +28,33 @@ Documentation = "https://github.com/DomaniLabs/Syntri/contracts"
 # NOT named `syntri`: that console script belongs to syntri-core, and a second
 # package claiming it would shadow the real CLI depending on install order.
 [project.scripts]
-syntri-pack = "cli.main:main"
+syntri-pack = "syntri_contracts.cli.main:main"
 
 [tool.setuptools]
 packages = [
-    "contracts",
-    "contracts.example_pack",
-    "experience",
-    "store",
-    "policy",
-    "nlu",
-    "capabilities",
-    "cli",
-    "cli.commands",
+    "syntri_contracts",
+    "syntri_contracts.contracts",
+    "syntri_contracts.contracts.example_pack",
+    "syntri_contracts.experience",
+    "syntri_contracts.store",
+    "syntri_contracts.policy",
+    "syntri_contracts.nlu",
+    "syntri_contracts.capabilities",
+    "syntri_contracts.cli",
+    "syntri_contracts.cli.commands",
 ]
 
 [tool.setuptools.package-data]
 # PEP 561. The packages are annotated; without this marker every consumer's
 # type checker silently treats the whole contract as Any, which is the
 # opposite of what a published contract is for.
-"contracts" = ["py.typed"]
-"contracts.example_pack" = ["manifest.yaml", "fixtures/*.json", "README.md"]
-"experience" = ["py.typed"]
-"store" = ["py.typed"]
-"policy" = ["py.typed"]
-"nlu" = ["py.typed"]
-"capabilities" = ["py.typed"]
-"cli" = ["py.typed"]
+"syntri_contracts.contracts" = ["py.typed", "example_pack/manifest.yaml", "example_pack/fixtures/*.json", "example_pack/README.md"]
+"syntri_contracts.experience" = ["py.typed"]
+"syntri_contracts.store" = ["py.typed"]
+"syntri_contracts.policy" = ["py.typed"]
+"syntri_contracts.nlu" = ["py.typed"]
+"syntri_contracts.capabilities" = ["py.typed"]
+"syntri_contracts.cli" = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -42,7 +42,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
-from contracts import (
+from syntri_contracts.contracts import (
     CapabilityPack,
     Decision,
     SlotState,

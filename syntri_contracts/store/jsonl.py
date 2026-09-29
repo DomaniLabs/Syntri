@@ -59,13 +59,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from experience.schema import (
+from syntri_contracts.experience.schema import (
     Episode,
     Interpretation,
     Judgment,
     Observation,
 )
-from store.base import Store
+from syntri_contracts.store.base import Store
 
 log = logging.getLogger(__name__)
 

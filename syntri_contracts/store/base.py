@@ -49,7 +49,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from datetime import datetime
 
-from experience.schema import (
+from syntri_contracts.experience.schema import (
     Episode,
     Interpretation,
     Judgment,

@@ -2,7 +2,7 @@
 
 import pytest
 
-from contracts.capability import (
+from syntri_contracts.contracts.capability import (
     CapabilityManifest,
     CapabilityPack,
     Decision,
@@ -12,7 +12,7 @@ from contracts.capability import (
     ToolSpec,
     WorkflowStatus,
 )
-from contracts.example_pack.pack import CheckBalancePack
+from syntri_contracts.contracts.example_pack.pack import CheckBalancePack
 
 
 def test_money_moving_tool_cannot_run_on_agent():
@@ -159,7 +159,10 @@ def test_manifest_yaml_matches_pack_manifest():
     yaml = pytest.importorskip("yaml")
     from pathlib import Path
 
-    path = Path(__file__).resolve().parents[1] / "contracts" / "example_pack" / "manifest.yaml"
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "syntri_contracts" / "contracts" / "example_pack" / "manifest.yaml"
+    )
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     from_yaml = CapabilityManifest(**data)
     assert from_yaml == CheckBalancePack.manifest

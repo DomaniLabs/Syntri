@@ -1,6 +1,6 @@
 """Public contracts for building Syntri capability packs."""
 
-from contracts.capability import (
+from syntri_contracts.contracts.capability import (
     CapabilityManifest,
     CapabilityPack,
     Decision,

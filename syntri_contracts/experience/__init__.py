@@ -6,7 +6,7 @@ private core. The production `ExperienceStore` backend that also reads and
 writes these rows stays in syntri-core; only the schema is public.
 """
 
-from experience.schema import (
+from syntri_contracts.experience.schema import (
     Actor,
     Disagreement,
     EntityGuess,

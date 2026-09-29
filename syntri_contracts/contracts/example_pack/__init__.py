@@ -3,6 +3,6 @@
 Copy this directory to start your own pack.
 """
 
-from contracts.example_pack.pack import CheckBalancePack
+from syntri_contracts.contracts.example_pack.pack import CheckBalancePack
 
 __all__ = ["CheckBalancePack"]

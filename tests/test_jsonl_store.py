@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from experience.schema import (
+from syntri_contracts.experience.schema import (
     Actor,
     Episode,
     Interpretation,
@@ -22,8 +22,8 @@ from experience.schema import (
     Observation,
     Outcome,
 )
-from store import JsonlStore
-from store.jsonl import (
+from syntri_contracts.store import JsonlStore
+from syntri_contracts.store.jsonl import (
     EPISODES,
     INTERPRETATIONS,
     JUDGMENTS,
@@ -177,7 +177,7 @@ def test_a_batch_that_cannot_serialise_writes_none_of_itself(store, monkeypatch)
     """
     store.append_observations([obs(text="before")])
 
-    import store.jsonl as jsonl
+    import syntri_contracts.store.jsonl as jsonl
 
     real_dumps = jsonl.json.dumps
     calls = {"n": 0}
@@ -413,7 +413,7 @@ def test_the_audit_logger_can_write_to_it(store):
     `AuditLogger` asks for `append_observations` and nothing else, so a
     deployment with no database can still keep a policy audit trail.
     """
-    from policy import AuditLogger, PolicyEngine
+    from syntri_contracts.policy import AuditLogger, PolicyEngine
 
     decision = PolicyEngine().evaluate("send_money", 0.31, "taxonomy")
 

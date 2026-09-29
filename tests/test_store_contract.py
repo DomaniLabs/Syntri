@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from experience.schema import (
+from syntri_contracts.experience.schema import (
     Actor,
     Episode,
     Interpretation,
@@ -24,8 +24,8 @@ from experience.schema import (
     Observation,
     Outcome,
 )
-from store import JsonlStore
-from store.base import Store
+from syntri_contracts.store import JsonlStore
+from syntri_contracts.store.base import Store
 
 NOW = datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc)
 

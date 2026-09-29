@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from contracts.capability import (
+from syntri_contracts.contracts.capability import (
     CapabilityManifest,
     CapabilityPack,
     Decision,

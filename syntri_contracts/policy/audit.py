@@ -30,9 +30,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from experience.schema import Actor, Observation, Origin
-from policy.engine import PolicyDecision
-from store.base import Store
+from syntri_contracts.experience.schema import Actor, Observation, Origin
+from syntri_contracts.policy.engine import PolicyDecision
+from syntri_contracts.store.base import Store
 
 log = logging.getLogger(__name__)
 

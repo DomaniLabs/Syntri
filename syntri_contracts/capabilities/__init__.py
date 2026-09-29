@@ -7,12 +7,12 @@ fixtures through `advance()` with no server, network or model. Together they
 are what `syntri pack validate` runs.
 """
 
-from capabilities.registry import (
+from syntri_contracts.capabilities.registry import (
     ENTRY_POINT_GROUP,
     CapabilityRegistry,
     default_registry,
 )
-from capabilities.replay import (
+from syntri_contracts.capabilities.replay import (
     FixtureOutcome,
     ReplayReport,
     TurnOutcome,

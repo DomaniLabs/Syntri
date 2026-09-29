@@ -25,7 +25,7 @@ syntri-core and is not part of the public distribution. Both satisfy the same
 nothing in the engine has to be told.
 """
 
-from store.base import Store
-from store.jsonl import JsonlStore
+from syntri_contracts.store.base import Store
+from syntri_contracts.store.jsonl import JsonlStore
 
 __all__ = ["JsonlStore", "Store"]

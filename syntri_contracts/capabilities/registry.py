@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 from importlib.metadata import entry_points
 
-from contracts import (
+from syntri_contracts.contracts import (
     CapabilityManifest,
     CapabilityPack,
     Executor,

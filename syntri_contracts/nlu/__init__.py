@@ -10,6 +10,6 @@ The private model-loading/construction helpers stay in syntri-core; build an
 `NLUPipeline` directly here. See `nlu/pipeline.py`.
 """
 
-from nlu.pipeline import NLUPipeline, Understanding
+from syntri_contracts.nlu.pipeline import NLUPipeline, Understanding
 
 __all__ = ["NLUPipeline", "Understanding"]
