@@ -201,6 +201,141 @@ class CaptureResponse(BaseModel):
     detail: str | None = None
 
 
+# --------------------------------------------------------------------------
+# Quality criteria
+# --------------------------------------------------------------------------
+#
+# What separates an interaction worth learning from as a positive example
+# from one that merely happened. Evaluated server-side against an outcome
+# event's payload when it is captured, so an SDK or an instance config can
+# declare "good" once and the loop applies it everywhere.
+#
+# The criteria live here, in the contract, rather than in each caller: a
+# customer who changes what "good" means changes one config, not every
+# place that reads an outcome.
+
+
+class QualityOperator(str, Enum):
+    """How a `QualitySignal` compares the resolved field to its value.
+
+    `exists`/`not_exists` test presence alone and ignore `value`; the
+    ordered comparisons coerce to float and fail closed on anything that
+    is not numeric; `contains` tests membership (substring or element).
+    """
+
+    EQUALS = "equals"
+    NOT_EQUALS = "not_equals"
+    GT = "gt"
+    GTE = "gte"
+    LT = "lt"
+    LTE = "lte"
+    EXISTS = "exists"
+    NOT_EXISTS = "not_exists"
+    CONTAINS = "contains"
+
+
+class QualitySignal(BaseModel):
+    """One condition on a dot-notation path into an outcome payload.
+
+    `field` is a dotted path resolved against the payload dict, e.g.
+    `payload.result.score`. `value` is unused for `exists`/`not_exists`.
+    """
+
+    field: str
+    operator: QualityOperator
+    value: Any | None = None
+
+
+class QualityConfig(BaseModel):
+    """The criteria that decide whether an outcome counts as good.
+
+    Two independent gates, both optional. When both are set both must
+    pass; when neither is set everything passes — no criteria means no
+    opinion, not "nothing is good".
+    """
+
+    good_signal: QualitySignal | None = None
+    min_outcome_score: float | None = None
+    require_all_three: bool = True
+    score_field: str | None = None
+
+    def evaluate(self, outcome_payload: dict) -> bool:
+        """Return True if `outcome_payload` passes the configured criteria.
+
+        Called server-side when an outcome event is captured.
+        """
+        if self.require_all_three and not outcome_payload:
+            return False
+
+        checks: list[bool] = []
+        if self.good_signal is not None:
+            checks.append(self._eval_signal(self.good_signal, outcome_payload))
+        if self.min_outcome_score is not None:
+            checks.append(self._eval_score(outcome_payload))
+
+        if not checks:
+            return True
+        return all(checks)
+
+    @staticmethod
+    def _resolve(path: str, payload: dict) -> tuple[bool, Any]:
+        """Walk a dotted path; return (found, value)."""
+        current: Any = payload
+        for part in path.split("."):
+            if not isinstance(current, dict) or part not in current:
+                return False, None
+            current = current[part]
+        return True, current
+
+    def _eval_signal(self, signal: QualitySignal, payload: dict) -> bool:
+        found, value = self._resolve(signal.field, payload)
+        op = signal.operator
+        if op is QualityOperator.EXISTS:
+            return found
+        if op is QualityOperator.NOT_EXISTS:
+            return not found
+        if not found:
+            return False
+        return self._apply(op, value, signal.value)
+
+    @staticmethod
+    def _apply(op: QualityOperator, actual: Any, expected: Any) -> bool:
+        if op is QualityOperator.EQUALS:
+            return bool(actual == expected)
+        if op is QualityOperator.NOT_EQUALS:
+            return bool(actual != expected)
+        if op is QualityOperator.CONTAINS:
+            try:
+                return expected in actual
+            except TypeError:
+                return False
+        # Ordered comparisons: numeric only, fail closed otherwise.
+        try:
+            a, b = float(actual), float(expected)
+        except (TypeError, ValueError):
+            return False
+        if op is QualityOperator.GT:
+            return a > b
+        if op is QualityOperator.GTE:
+            return a >= b
+        if op is QualityOperator.LT:
+            return a < b
+        if op is QualityOperator.LTE:
+            return a <= b
+        return False
+
+    def _eval_score(self, payload: dict) -> bool:
+        field = self.score_field or "score"
+        found, value = self._resolve(field, payload)
+        if not found:
+            return False
+        # bool is an int subclass but is never a score.
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return False
+        assert self.min_outcome_score is not None  # guarded by caller
+        return value >= self.min_outcome_score
+
+
 class EntityGuess(BaseModel):
     model_config = ConfigDict(frozen=True)
     field: str

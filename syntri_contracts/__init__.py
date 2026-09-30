@@ -7,4 +7,4 @@ engine, the base NLU pipeline, the pack registry/replay machinery, and the
 `syntri-pack` CLI.
 """
 
-__version__ = "0.3.2"
+__version__ = "0.3.3"
