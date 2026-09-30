@@ -8,6 +8,9 @@ writes these rows stays in syntri-core; only the schema is public.
 
 from syntri_contracts.experience.schema import (
     Actor,
+    CaptureEvent,
+    CaptureEventType,
+    CaptureResponse,
     Disagreement,
     EntityGuess,
     Episode,
@@ -19,12 +22,16 @@ from syntri_contracts.experience.schema import (
     Observation,
     Origin,
     Outcome,
+    SubjectMapEntry,
     disagree,
     score,
 )
 
 __all__ = [
     "Actor",
+    "CaptureEvent",
+    "CaptureEventType",
+    "CaptureResponse",
     "Disagreement",
     "Episode",
     "EntityGuess",
@@ -36,6 +43,7 @@ __all__ = [
     "Observation",
     "Origin",
     "Outcome",
+    "SubjectMapEntry",
     "disagree",
     "score",
 ]

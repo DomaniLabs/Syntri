@@ -50,6 +50,13 @@ class Observation(BaseModel):
     # it in place so a subject's messages cannot be re-grouped by session.
     session_id: str | None
     episode_id: str | None = None
+    # The observation this one answers. An agent's reply and the outcome
+    # that followed both carry the `observation_id` of the user event
+    # that triggered them, which is what makes a single interaction
+    # queryable as a whole — see `CaptureEvent`. None on the first event
+    # of an interaction, and on every record written by the batch ingest
+    # path, which groups by session instead.
+    correlation_id: str | None = None
     actor: Actor = Actor.USER
     channel: str = "unknown"
     text: str
@@ -86,6 +93,112 @@ class SubjectMapEntry:
     observation_id: str
     placeholder: str
     fingerprint: str
+
+
+# --------------------------------------------------------------------------
+# The capture contract
+# --------------------------------------------------------------------------
+#
+# What an application posts to `POST /v1/capture`, in any language, with
+# no Syntri-side knowledge of what the application does.
+#
+# An interaction is three events, not one. The user said something, the
+# agent answered, and something happened as a result — and the third is
+# the only one that says whether the first two went well. A contract
+# that captured just the inbound message would collect utterances and no
+# supervision signal, which is the difference between a corpus and a
+# training set.
+#
+#     input    ──> event_id: obs_a1b2…
+#                      │
+#     output   ──> correlation_id: obs_a1b2…
+#     outcome  ──> correlation_id: obs_a1b2…
+#
+# The link is the input event's own id, handed back to the caller in the
+# response so it can be threaded onto whatever follows. The caller keeps
+# nothing else and needs no second round trip.
+
+
+class CaptureEventType(str, Enum):
+    """
+    What kind of event this is, and therefore what links to what.
+
+    INPUT    something arrived from a user. Starts an interaction; its
+             `event_id` is the handle for everything that follows.
+    OUTPUT   what the application answered. Links to an input.
+    OUTCOME  what actually happened — the payment settled, the user gave
+             up, a human took over. Links to the same input.
+    """
+
+    INPUT = "input"
+    OUTPUT = "output"
+    OUTCOME = "outcome"
+
+
+class CaptureEvent(BaseModel):
+    """
+    One event, from any application, in any shape.
+
+    `payload` is opaque on purpose. Syntri stores it, tokenises the
+    identifiers it finds in it and learns from it, but requires no
+    particular keys: the customer decides what an event of theirs
+    contains, and a contract that demanded a schema would make every new
+    application a change to this file.
+
+    PII is *not* the caller's problem. The server tokenises phone
+    numbers, emails and account numbers out of `payload` at ingestion,
+    before anything is written. An SDK that tokenised client-side would
+    put the erasure guarantee in someone else's deployment and make each
+    caller's fingerprints incompatible with every other caller's.
+    """
+
+    instance_id: str
+    event_type: CaptureEventType
+    payload: dict[str, Any] = Field(default_factory=dict)
+    #: Optional. Groups events into a conversation. Output and outcome
+    #: events inherit the input's when they name none.
+    session_id: str | None = None
+    #: Required for `output` and `outcome`, and must be None on `input` —
+    #: an input starts an interaction, so there is nothing for it to
+    #: point at. Carries the `event_id` the server returned for the
+    #: input event.
+    correlation_id: str | None = None
+    #: Caller-supplied context. `metadata.channel` becomes the
+    #: Observation's channel when present.
+    metadata: dict[str, Any] | None = None
+    #: When it happened, not when it arrived. The server fills this in
+    #: if it is absent, but a caller that batches or retries should send
+    #: its own — arrival time is not event time.
+    timestamp: datetime | None = None
+
+
+class CaptureResponse(BaseModel):
+    """
+    The outcome of a capture, always at HTTP 200.
+
+    The caller is a production application whose request handler is not
+    a place where an exception is survivable, so the verdict is in the
+    body and never in the status line. `status` is one of:
+
+        captured        written; `event_id` names the row
+        unprocessable   the event could not be linked or read
+        write_failed    the store would not take it
+
+    Auth failures are the exception and stay 401/403: a bad key is a
+    configuration error that no amount of quiet retrying fixes.
+
+    `event_id` is None on every failure path, which is why it is
+    nullable. On an `input` event it is returned twice — once as itself
+    and once as `correlation_id` — so the caller can thread the output
+    and outcome onto it without inventing an id of its own.
+    """
+
+    event_id: str | None = None
+    status: str
+    correlation_id: str | None = None
+    #: Why, when `status` is not "captured". For the caller's logs; never
+    #: load-bearing, and never a reason to fail a request.
+    detail: str | None = None
 
 
 class EntityGuess(BaseModel):
